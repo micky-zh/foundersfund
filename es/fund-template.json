@@ -1,0 +1,68 @@
+{
+  "order": 0,
+  "index_patterns": [
+    "fund_*"
+  ],
+  "settings": {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    }
+  },
+  "mappings": {
+    "properties": {
+      "id": {
+        "type": "keyword",
+        "store": true
+      },
+      "name": {
+        "type": "keyword",
+        "store": true
+      },
+      "kind": {
+        "type": "keyword",
+        "store": true
+      },
+      "company": {
+        "type": "keyword",
+        "store": true
+      },
+      "manager": {
+        "type": "keyword",
+        "store": true
+      },
+      "sharp1": {
+        "type": "float",
+        "store": true
+      },
+      "sharp2": {
+        "type": "float",
+        "store": true
+      },
+      "sharp3": {
+        "type": "float",
+        "store": true
+      },
+      "max_draw_down": {
+        "type": "float",
+        "store": true
+      },
+      "wave1": {
+        "type": "float",
+        "store": true
+      },
+      "wave2": {
+        "type": "float",
+        "store": true
+      },
+      "wave3": {
+        "type": "float",
+        "store": true
+      },
+      "created": {
+        "type": "date",
+        "format": "yyyy-MM-dd||yyyy-MM-dd HH:mm:ss||yyyy-MM-dd HH:mm:ss:SSS||yyyy-MM-dd||strict_date_optional_time||epoch_millis"
+      }
+    }
+  }
+}
