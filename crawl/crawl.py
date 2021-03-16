@@ -8,7 +8,7 @@ import time
 import requests
 from bs4 import BeautifulSoup
 
-from es.base import gen_data
+from es.base import gen_es_data, gen_csv_data
 
 _headers = {
     'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36',
@@ -272,6 +272,7 @@ def parse_fund_info(html):
 
 def start():
     fund_dict = {}
+    # fund_list = []
     # 获取所有的基金代号，名称
     for i in range(1, 54):
         print("获取基金列表,当前第%s页" % i)
@@ -280,6 +281,10 @@ def start():
 
         curr_dict = parse_fund(html)
         fund_dict.update(curr_dict)
+        # fund_list.extend(list(curr_dict.keys()))
+        # break
+
+    # fund_list.reverse()
 
     if not os.path.exists("../data"):
         os.makedirs("../data")
@@ -289,10 +294,12 @@ def start():
     with open(f, "w") as file:
 
         file.write("基金代号,基金名称,类型,公司,成立日期,基金经理,近1年夏普比率,近2年夏普比率,近3年夏普比率,近1年标准差,近2年标准差,近3年标准差,近1年最大回撤\n")
-
         # 解析所有代号的 夏普比率、标准差(波动率)
         info_url = "http://fundf10.eastmoney.com/tsdata_%s.html"
+
+        # for k in fund_list:
         for k, v in fund_dict.items():
+
             print(info_url % k)
             print("基金名称", v)
             print("基金代号", k)
@@ -326,11 +333,13 @@ def start():
             print()
             # break
 
-    gen_data(f)
+    gen_es_data(f)
+    gen_csv_data()
 
 
 if __name__ == "__main__":
     start()
+
     # a = max_draw_down("001106")
     # print(a)
 

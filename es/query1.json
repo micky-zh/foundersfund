@@ -2,7 +2,8 @@
   "size": 0,
   "query": {
     "bool": {
-      "must": [
+      "filter": [
+
         {
           "range": {
             "created": {
@@ -13,14 +14,14 @@
         {
           "range": {
             "sharp1": {
-              "gt": 1
+              "gt": 2
             }
           }
         },
         {
           "range": {
             "wave1": {
-              "lte": 10,
+              "lte": 20,
               "gt": 0
             }
           }
@@ -62,7 +63,7 @@
                 }
               }
             ],
-            "size": 30
+            "size": 100
           }
         }
       }
