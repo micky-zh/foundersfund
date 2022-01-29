@@ -2,13 +2,12 @@ from __future__ import division
 
 import datetime
 import os
+import random
 import re
 import time
 
 import requests
 from bs4 import BeautifulSoup
-
-from es.base import gen_es_data, gen_csv_data
 
 _headers = {
     'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36',
@@ -108,7 +107,7 @@ def get_last_line(f_name):
         return last_line
 
 
-def max_draw_down(code):
+def crawl_max_draw_down(code):
     """
     获取所有净值: 如果本地文件存在则跳过
     计算最大回撤
@@ -141,8 +140,11 @@ def max_draw_down(code):
                 file.write("%s,%s,%s,%s,%s,%s\n" % (item[0], item[1], item[2], item[3], item[4], item[5]))
                 # print("%s,%s,%s,%s,%s,%s\n" % (item[0], item[1], item[2], item[3], item[4], item[5]))
 
+
+def max_draw_down_count(code):
     result = []
     _counter = 0
+    f = "../data/jingzhi/%s.csv" % code
     with open(f, 'r') as f:
         for line in f:
             _counter += 1
@@ -208,6 +210,54 @@ def withdrawal(value_arr):
     return rate
 
 
+def rate_of_return(fund_id):
+    html = craw_tt_jj(
+        "http://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jdzf&code=%s" % fund_id)
+    # print(html)
+    self_dict = {}
+    same_dict = {}
+    soup = BeautifulSoup(html, 'html.parser')
+    counter = 0
+    for item in soup.find_all("ul"):
+        # print(item)
+        _arr = item.find_all("li")
+        print(_arr[0].get_text(), _arr[1].get_text(), _arr[2].get_text())
+
+        counter += 1
+
+        if 1 == counter:
+            continue
+        if 2 == counter:
+            self_dict.setdefault("this_year", _arr[1].get_text())
+            same_dict.setdefault("this_year", _arr[2].get_text())
+        if 3 == counter:
+            self_dict.setdefault("week", _arr[1].get_text())
+            same_dict.setdefault("week", _arr[2].get_text())
+        if 4 == counter:
+            self_dict.setdefault("1_month", _arr[1].get_text())
+            same_dict.setdefault("1_month", _arr[2].get_text())
+        if 5 == counter:
+            self_dict.setdefault("3_month", _arr[1].get_text())
+            same_dict.setdefault("3_month", _arr[2].get_text())
+        if 6 == counter:
+            self_dict.setdefault("6_month", _arr[1].get_text())
+            same_dict.setdefault("6_month", _arr[2].get_text())
+        if 7 == counter:
+            self_dict.setdefault("1_year", _arr[1].get_text())
+            same_dict.setdefault("1_year", _arr[2].get_text())
+        if 8 == counter:
+            self_dict.setdefault("2_year", _arr[1].get_text())
+            same_dict.setdefault("2_year", _arr[2].get_text())
+        if 9 == counter:
+            self_dict.setdefault("3_year", _arr[1].get_text())
+            same_dict.setdefault("3_year", _arr[2].get_text())
+        if 10 == counter:
+            self_dict.setdefault("5_year", _arr[1].get_text())
+            same_dict.setdefault("5_year", _arr[2].get_text())
+
+    return self_dict, same_dict
+
+
 def parse_fund(html):
     """
     根据返回的内容获取到 基金的代号 以及 基金的名称
@@ -246,8 +296,8 @@ def parse_fund_info(html):
     print("成立日期", items.text)
     info_dict["fund_create_date"] = items.text
 
-    items = soup.select("div.bs_gl label")[1].contents[1]
-    print("基金经理", items.text)
+    items = soup.select("div.bs_gl label")[1]
+    print("基金经理", items.contents[1].text if len(items.contents) >= 2 else "--")
     info_dict["fund_charge"] = items.text
 
     items = soup.select("div.bs_gl label")[2].contents[1]
@@ -274,7 +324,7 @@ def start():
     fund_dict = {}
     # fund_list = []
     # 获取所有的基金代号，名称
-    for i in range(1, 54):
+    for i in range(1, 67):
         print("获取基金列表,当前第%s页" % i)
         list_url = "http://fund.eastmoney.com/Data/Fund_JJJZ_Data.aspx?t=1&lx=1&letter=&gsid=&text=&sort=zdf,desc&page=%s,200&dt=1615542928187&atfc=&onlySale=0"
         html = craw_tt_jj(list_url % i)
@@ -290,58 +340,151 @@ def start():
         os.makedirs("../data")
 
     _time = time.strftime("%Y-%m-%d", time.localtime())
-    f = "../data/%s.csv" % _time
-    with open(f, "w") as file:
+    csv_f = "../data/%s.csv" % _time
 
-        file.write("基金代号,基金名称,类型,公司,成立日期,基金经理,近1年夏普比率,近2年夏普比率,近3年夏普比率,近1年标准差,近2年标准差,近3年标准差,近1年最大回撤\n")
-        # 解析所有代号的 夏普比率、标准差(波动率)
-        info_url = "http://fundf10.eastmoney.com/tsdata_%s.html"
+    lines_set = set()
 
-        # for k in fund_list:
-        for k, v in fund_dict.items():
+    local_cache_file = "../data/%s.cache" % _time
+    if not os.path.exists(local_cache_file):
+        lines_set = set()
+    else:
+        with open(local_cache_file) as tmp_file:
+            lines = tmp_file.readlines()
+            lines_set = set(lines)
+    # try:
 
-            print(info_url % k)
-            print("基金名称", v)
-            print("基金代号", k)
+    if not os.path.exists(csv_f):
+        with open(csv_f, "w") as file:
+            file.write(
+                "基金代号,基金名称,类型,公司,成立日期,基金经理,近1年夏普比率,近2年夏普比率,近3年夏普比率,近1年标准差,近2年标准差,近3年标准差,近1年最大回撤,近1周,近1月,近3月,近6月,今年以来,近1年,近两年,近三年,评级\n")
+            # 解析所有代号的 夏普比率、标准差(波动率)
 
-            max_draw = round(max_draw_down(k) * 100, 2)
-            print("最大回撤", max_draw)
+    # 解析所有代号的 夏普比率、标准差(波动率)
+    info_url = "http://fundf10.eastmoney.com/tsdata_%s.html"
 
-            # 夏普比率,标准差
-            html = craw_tt_jj(info_url % k)
+    # for k in fund_list:
+    for k, v in fund_dict.items():
 
-            _dict = parse_fund_info(html)
+        if k + "\n" in lines_set:
+            print("hit cache! 基金名称: %s, 基金代号 : %s, url:%s" % (v, k, info_url % k))
+            continue
+        else:
+            crawl_max_draw_down(k)
 
-            _volatility1 = _dict['volatility'][0]
-            if "%" in _dict['volatility'][0]:
-                _volatility1 = float(_dict['volatility'][0].replace("%", ""))
+        print("crawl 基金名称: %s, 基金代号 : %s, url:%s" % (v, k, info_url % k))
+        # self_dict, same_dict = rate_of_return(k)
 
-            _volatility2 = _dict['volatility'][1]
-            if "%" in _dict['volatility'][1]:
-                _volatility2 = float(_dict['volatility'][1].replace("%", ""))
+        # 年度收益
+        inc_dict = parse_income(k)
 
-            _volatility3 = _dict['volatility'][2]
-            if "%" in _dict['volatility'][2]:
-                _volatility3 = float(_dict['volatility'][2].replace("%", ""))
+        # 夏普比率,标准差
+        html = craw_tt_jj(info_url % k)
 
+        _dict = parse_fund_info(html)
+
+        _volatility1 = _dict['volatility'][0]
+        if "%" in _dict['volatility'][0]:
+            _volatility1 = float(_dict['volatility'][0].replace("%", ""))
+
+        _volatility2 = _dict['volatility'][1]
+        if "%" in _dict['volatility'][1]:
+            _volatility2 = float(_dict['volatility'][1].replace("%", ""))
+
+        _volatility3 = _dict['volatility'][2]
+        if "%" in _dict['volatility'][2]:
+            _volatility3 = float(_dict['volatility'][2].replace("%", ""))
+
+        max_draw = round(max_draw_down_count(k) * 100, 2)
+        print("最大回撤", max_draw)
+        with open(csv_f, "a") as file:
             # 计算最大回撤一年内
-            file.write("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n" % (
+            file.write("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n" % (
                 k, v, _dict['fund_type'], _dict['fund_company'], _dict['fund_create_date'], _dict['fund_charge'],
                 _dict['sharp'][0], _dict['sharp'][1], _dict['sharp'][2], _volatility1,
-                _volatility2, _volatility3, max_draw))
+                _volatility2, _volatility3, max_draw, inc_dict['week'], inc_dict["month"], inc_dict["3month"],
+                inc_dict["6month"],
+                inc_dict["year"], inc_dict["1year"], inc_dict["2year"], inc_dict["3year"], inc_dict["change"],
+                inc_dict["rate"]))
 
-            print()
+        if 10 > random.randint(1, 100):
+            time.sleep(1)
+
+        lines_set.add(k)
+        with open(local_cache_file, "a") as tmp_file:
+            tmp_file.write(k + "\n")
+
             # break
+    # except Exception as e:
+    #     print()
+    #     print("Oops!", e.__class__, e)
+    #     print()
+    #
+    # with open(local_cache_file, "w") as tmp_file:
+    #     for line in lines_set:
+    #
+    #         if line.strip():
+    #             tmp_file.write(line+"\n")
 
-    gen_es_data(f)
-    gen_csv_data()
+    # gen_es_data(f)
+    # gen_csv_data()
+
+
+def parse_income(code):
+    """
+    解析html中的 最近收益
+    """
+
+    info_url = "http://fund.eastmoney.com/%s.html" % code
+    html = craw_tt_jj(info_url)
+
+    info_dict = {}
+    soup = BeautifulSoup(html, 'html.parser')
+
+    items = soup.select("#increaseAmount_stage tr div.Rdata")
+
+    info_dict["week"] = items[0].text.replace("%", "")
+    info_dict["month"] = items[1].text.strip().replace("%", "")
+    info_dict["3month"] = items[2].text.strip().replace("%", "")
+    info_dict["6month"] = items[3].text.strip().replace("%", "")
+    info_dict["year"] = items[4].text.strip().replace("%", "")
+    info_dict["1year"] = items[5].text.strip().replace("%", "")
+    info_dict["2year"] = items[6].text.strip().replace("%", "")
+    info_dict["3year"] = items[7].text.strip().replace("%", "")
+
+    items2 = soup.select("div.poptableWrap.jjhsl td")
+    if len(items2) == 1:
+        info_dict["change"] = "暂无数据"
+    else:
+        info_dict["change"] = "%s %s %s %s %s %s %s %s" % (
+            items2[0].text if len(items2) > 0 else "",
+            items2[1].text if len(items2) > 1 else "",
+            items2[2].text if len(items2) > 2 else "",
+            items2[3].text if len(items2) > 3 else "",
+            items2[4].text if len(items2) > 4 else "",
+            items2[5].text if len(items2) > 5 else "",
+            items2[6].text if len(items2) > 6 else "",
+            items2[7].text if len(items2) > 7 else "")
+
+    info_dict["change"] = info_dict["change"].strip()
+
+    info_dict["rate"] = str(soup.select("div.infoOfFund div")[-1]["class"][0].replace("jjpj", ""))
+    if not info_dict['rate']:
+        info_dict['rate'] = "0"
+    return info_dict
 
 
 if __name__ == "__main__":
     start()
 
+    # html = craw_tt_jj("http://fundf10.eastmoney.com/tsdata_014758.html")
+
+    # _dict = parse_fund_info(html)
+
+    # parse_income("011113")
     # a = max_draw_down("001106")
     # print(a)
 
     # r = withdrawal([1, 0.9, 2, 1, 3, 1])
     # print(r)
+
+    # rate_of_return("011473")
