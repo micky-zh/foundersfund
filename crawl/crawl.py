@@ -298,7 +298,7 @@ def parse_fund_info(html):
 
     items = soup.select("div.bs_gl label")[1]
     print("基金经理", items.contents[1].text if len(items.contents) >= 2 else "--")
-    info_dict["fund_charge"] = items.text
+    info_dict["fund_charge"] = items.contents[1].text if len(items.contents) >= 2 else "--"
 
     items = soup.select("div.bs_gl label")[2].contents[1]
     print("类型", items.text)
@@ -324,7 +324,7 @@ def start():
     fund_dict = {}
     # fund_list = []
     # 获取所有的基金代号，名称
-    for i in range(1, 67):
+    for i in range(1, 101):
         print("获取基金列表,当前第%s页" % i)
         list_url = "http://fund.eastmoney.com/Data/Fund_JJJZ_Data.aspx?t=1&lx=1&letter=&gsid=&text=&sort=zdf,desc&page=%s,200&dt=1615542928187&atfc=&onlySale=0"
         html = craw_tt_jj(list_url % i)
@@ -356,7 +356,7 @@ def start():
     if not os.path.exists(csv_f):
         with open(csv_f, "w") as file:
             file.write(
-                "基金代号,基金名称,类型,公司,成立日期,基金经理,近1年夏普比率,近2年夏普比率,近3年夏普比率,近1年标准差,近2年标准差,近3年标准差,近1年最大回撤,近1周,近1月,近3月,近6月,今年以来,近1年,近两年,近三年,评级\n")
+                "基金代号,基金名称,类型,公司,成立日期,基金经理,近1年夏普比率,近2年夏普比率,近3年夏普比率,近1年标准差,近2年标准差,近3年标准差,近1年最大回撤,近1周,近1月,近3月,近6月,今年以来,近1年,近两年,近三年,换手率,评级\n")
             # 解析所有代号的 夏普比率、标准差(波动率)
 
     # 解析所有代号的 夏普比率、标准差(波动率)
