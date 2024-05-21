@@ -1,6 +1,7 @@
 from __future__ import division
 
 import datetime
+import json
 import os
 import random
 import re
@@ -105,6 +106,22 @@ def get_last_line(f_name):
             pass
         last_line = line
         return last_line
+
+
+def read_file_to_dict(f_name):
+    bull_dict = {}
+    if os.path.isfile(f_name):
+        with open(f_name) as f:
+            for line in f:
+                funder = line.split("\t")
+                bull_dict[funder[0]] = funder[1]
+    return bull_dict
+
+
+def write_dict_to_file(f_name, bull_dict):
+    with open(f_name) as file:
+        for k, v in bull_dict.items():
+            file.write("%s\t%s\n" % (k, v))
 
 
 def crawl_max_draw_down(code):
@@ -320,6 +337,25 @@ def parse_fund_info(html):
     return info_dict
 
 
+def check_charge_is_bull(code):
+    url = "https://j5.fund.eastmoney.com/sc/tfs/qt/v2.0.1/%s.json?deviceid=1234567.py.service&version=6.5.5&appVersion=6.5.5&product=EFund&plat=web&curTime=1709185730881" % code
+    html = craw_tt_jj(url)
+    dict_obj = json.loads(html)
+    # print(dict_obj)
+    if "JJJLNEW" in dict_obj:
+        arr = dict_obj["JJJLNEW"]["Datas"][0]["MANGER"]
+        for item in arr:
+            if item["HJ_JN"] == 3:
+                return True
+    else:
+        arr = dict_obj["JJJL"]["Expansion"]
+        for item in arr:
+            if item["HJ_JN"] == 3:
+                return True
+
+    return False
+
+
 def start():
     fund_dict = {}
     # fund_list = []
@@ -342,7 +378,11 @@ def start():
     _time = time.strftime("%Y-%m-%d", time.localtime())
     csv_f = "../data/%s.csv" % _time
 
-    lines_set = set()
+    if not os.path.exists("../data/bull"):
+        os.makedirs("../data/bull")
+
+    bull_f = "../data/bull/buffalo"
+    bull_dict = read_file_to_dict(bull_f)
 
     local_cache_file = "../data/%s.cache" % _time
     if not os.path.exists(local_cache_file):
@@ -356,7 +396,7 @@ def start():
     if not os.path.exists(csv_f):
         with open(csv_f, "w") as file:
             file.write(
-                "基金代号,基金名称,类型,公司,成立日期,基金经理,近1年夏普比率,近2年夏普比率,近3年夏普比率,近1年标准差,近2年标准差,近3年标准差,近1年最大回撤,近1周,近1月,近3月,近6月,今年以来,近1年,近两年,近三年,换手率,评级\n")
+                "基金代号,基金名称,类型,公司,成立日期,基金经理,近1年夏普比率,近2年夏普比率,近3年夏普比率,近1年标准差,近2年标准差,近3年标准差,近1年最大回撤,近1周,近1月,近3月,近6月,今年以来,近1年,近两年,近三年,换手率,评级,金牛经理\n")
             # 解析所有代号的 夏普比率、标准差(波动率)
 
     # 解析所有代号的 夏普比率、标准差(波动率)
@@ -371,6 +411,9 @@ def start():
         else:
             crawl_max_draw_down(k)
 
+        random_number = random.randint(0, 2)
+        # time.sleep(random_number)
+
         print("crawl 基金名称: %s, 基金代号 : %s, url:%s" % (v, k, info_url % k))
         # self_dict, same_dict = rate_of_return(k)
 
@@ -381,6 +424,15 @@ def start():
         html = craw_tt_jj(info_url % k)
 
         _dict = parse_fund_info(html)
+
+        # 计算是否是金牛基金经理
+        # charge = _dict['fund_charge']
+        # if charge in bull_dict:
+        #     _dict['fund_charge_bull'] = bull_dict[charge]
+        # else:
+        res_bull = "是" if check_charge_is_bull(k) else "否"
+        _dict['fund_charge_bull'] = res_bull
+        # bull_dict[charge] = res_bull
 
         _volatility1 = _dict['volatility'][0]
         if "%" in _dict['volatility'][0]:
@@ -398,13 +450,13 @@ def start():
         print("最大回撤", max_draw)
         with open(csv_f, "a") as file:
             # 计算最大回撤一年内
-            file.write("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n" % (
+            file.write("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n" % (
                 k, v, _dict['fund_type'], _dict['fund_company'], _dict['fund_create_date'], _dict['fund_charge'],
                 _dict['sharp'][0], _dict['sharp'][1], _dict['sharp'][2], _volatility1,
                 _volatility2, _volatility3, max_draw, inc_dict['week'], inc_dict["month"], inc_dict["3month"],
                 inc_dict["6month"],
                 inc_dict["year"], inc_dict["1year"], inc_dict["2year"], inc_dict["3year"], inc_dict["change"],
-                inc_dict["rate"]))
+                inc_dict["rate"], _dict['fund_charge_bull']))
 
         if 10 > random.randint(1, 100):
             time.sleep(1)
@@ -414,6 +466,8 @@ def start():
             tmp_file.write(k + "\n")
 
             # break
+
+    # write_dict_to_file(bull_f, bull_dict)
     # except Exception as e:
     #     print()
     #     print("Oops!", e.__class__, e)
@@ -475,6 +529,9 @@ def parse_income(code):
 
 if __name__ == "__main__":
     start()
+
+    # res = check_charge_is_bull("000254")
+    # print(res)
 
     # html = craw_tt_jj("http://fundf10.eastmoney.com/tsdata_014758.html")
 
